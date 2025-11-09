@@ -1,0 +1,108 @@
+# ------------------------------------------------------------
+# Implementing Feedforward Neural Networks with Keras and TensorFlow
+# (Convolutional Neural Network version for MNIST)
+# ------------------------------------------------------------
+
+# Step 1: Import the necessary packages
+import numpy as np                            # For numerical and array operations
+import tensorflow as tf                       # TensorFlow (deep learning framework)
+from tensorflow.keras.datasets import mnist   # MNIST dataset loader
+from tensorflow.keras.models import Sequential # Sequential model type
+from tensorflow.keras.layers import Dense, Conv2D, MaxPooling2D, Flatten, Dropout
+import matplotlib.pyplot as plt               # For visualizations
+
+# ------------------------------------------------------------
+# Step 2: Load and preprocess the MNIST dataset
+# ------------------------------------------------------------
+
+print("[INFO] accessing MNIST...")
+
+# Load training and test data
+# Each image is 28x28 pixels and grayscale (values 0–255)
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+# Reshape images to add a single channel dimension (for Conv2D input)
+# (num_samples, height, width, channels)
+x_train = x_train.reshape((x_train.shape[0], 28, 28, 1)).astype('float32') / 255
+x_test = x_test.reshape((x_test.shape[0], 28, 28, 1)).astype('float32') / 255
+
+# ------------------------------------------------------------
+# Step 3: Define the CNN architecture
+# ------------------------------------------------------------
+
+# Initialize a Sequential model — stack layers one after another
+model = Sequential()
+
+# -------- Convolutional + Pooling layers --------
+# First convolutional layer: detects spatial patterns using 28 filters of size 3x3
+# Input shape must match the reshaped image: (28, 28, 1)
+model.add(Conv2D(28, kernel_size=(3, 3), input_shape=(28, 28, 1)))
+
+# MaxPooling layer: reduces spatial dimensions (downsamples feature maps)
+# Keeps strongest features while reducing computation
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+# Flatten layer: converts 2D feature maps into a 1D vector for fully connected layers
+model.add(Flatten())
+
+# -------- Fully Connected (Dense) layers --------
+# Dense layer with 200 neurons and ReLU activation — learns complex representations
+model.add(Dense(200, activation="relu"))
+
+# Dropout layer: randomly drops 30% of neurons during training to prevent overfitting
+model.add(Dropout(0.3))
+
+# Output layer: 10 neurons (for digits 0–9), with softmax activation for probabilities
+model.add(Dense(10, activation="softmax"))
+
+# Print model summary (architecture, parameters, output shapes)
+model.summary()
+
+# ------------------------------------------------------------
+# Step 4: Compile the model
+# ------------------------------------------------------------
+# Define:
+# - Optimizer: Adam (adaptive gradient descent)
+# - Loss function: sparse categorical crossentropy (used for integer labels)
+# - Metric: accuracy (to monitor model performance)
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# ------------------------------------------------------------
+# Step 5: Train the model
+# ------------------------------------------------------------
+# Fit the model to training data
+# epochs=2 means the network will see all training images twice
+model.fit(x_train, y_train, epochs=2)
+
+# ------------------------------------------------------------
+# Step 6: Evaluate the model on test data
+# ------------------------------------------------------------
+# Compute loss and accuracy on unseen test set
+test_loss, test_accuracy = model.evaluate(x_test, y_test)
+print(f'Test accuracy: {test_accuracy*100:.2f}%')
+
+# ------------------------------------------------------------
+# Step 7: Test a single image prediction
+# ------------------------------------------------------------
+
+# Select one image from the test dataset (index 9)
+image = x_test[9]
+
+# Display the selected image (in grayscale)
+plt.imshow(image, cmap='Greys')
+plt.title("Test Image Example")
+plt.axis('off')
+plt.show()
+
+# Reshape the image to match input dimensions expected by the model: (1, 28, 28, 1)
+image = image.reshape(1, 28, 28, 1)
+
+# Predict class probabilities for the image
+prediction = model.predict(image)
+
+# Get the class with the highest probability (the predicted digit)
+print("Predicted Digit:", np.argmax(prediction))
