@@ -1,0 +1,124 @@
+# ------------------------------------------------------------
+# Simple Autoencoder on Fashion-MNIST (with detailed comments)
+# ------------------------------------------------------------
+
+# Imports
+import matplotlib.pyplot as plt      # plotting
+import numpy as np                  # numerical operations
+import pandas as pd                 # not used directly but commonly useful
+import tensorflow as tf             # core deep learning library
+
+# Scikit-learn utilities (not strictly required here but handy for metrics/splitting)
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.model_selection import train_test_split
+
+# Keras building blocks
+from tensorflow.keras import layers, losses
+from tensorflow.keras.datasets import fashion_mnist
+from tensorflow.keras.models import Model
+
+# -------------------------
+# Load and preprocess data
+# -------------------------
+# Fashion-MNIST: 28x28 grayscale images of clothing items (labels not needed for autoencoders)
+(x_train, _), (x_test, _) = fashion_mnist.load_data()
+
+# Normalize pixel values to range [0, 1] and cast to float32 for numerical stability
+x_train = x_train.astype('float32') / 255.0
+x_test  = x_test.astype('float32')  / 255.0
+
+# Print shapes to confirm data dimensions
+print("x_train shape:", x_train.shape)   # expected (60000, 28, 28)
+print("x_test  shape:", x_test.shape)    # expected (10000, 28, 28)
+
+# -------------------------
+# Define Autoencoder class
+# -------------------------
+# We'll build a small dense autoencoder:
+# - Encoder: Flattens input and maps to a low-dimensional latent vector
+# - Decoder: Maps latent vector back to 784 dims and reshapes to 28x28
+latent_dim = 64
+
+class Autoencoder(Model):
+    def __init__(self, latent_dim):
+        super(Autoencoder, self).__init__()
+        self.latent_dim = latent_dim
+
+        # Encoder: Flatten the 28x28 image → Dense to latent_dim
+        # Use ReLU activation to introduce non-linearity
+        self.encoder = tf.keras.Sequential([
+            layers.Flatten(),                      # (28,28) -> (784,)
+            layers.Dense(latent_dim, activation='relu'),
+        ])
+
+        # Decoder: Dense to 784 units with sigmoid (to produce values in [0,1])
+        # Then reshape back to (28,28)
+        self.decoder = tf.keras.Sequential([
+            layers.Dense(784, activation='sigmoid'),  # (latent_dim,) -> (784,)
+            layers.Reshape((28, 28))                   # -> (28,28)
+        ])
+
+    # call: forward pass for the model (used during training/inference)
+    def call(self, x):
+        encoded = self.encoder(x)   # get latent representation
+        decoded = self.decoder(encoded)  # reconstruct input from latent vector
+        return decoded
+
+# -------------------------
+# Instantiate and compile
+# -------------------------
+autoencoder = Autoencoder(latent_dim=latent_dim)
+
+# Use Adam optimizer and mean squared error (MSE) reconstruction loss
+autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
+
+# -------------------------
+# Train the autoencoder
+# -------------------------
+# We pass x_train as both inputs and targets (unsupervised reconstruction task)
+history = autoencoder.fit(
+    x_train, x_train,
+    epochs=10,
+    shuffle=True,
+    validation_data=(x_test, x_test)
+)
+
+# -------------------------
+# Encode and decode test images
+# -------------------------
+# encoded_imgs: the latent vectors for the test set
+encoded_imgs = autoencoder.encoder(x_test).numpy()
+
+# decoded_imgs: reconstructed images from the latent vectors
+decoded_imgs = autoencoder.decoder(encoded_imgs).numpy()
+
+# -------------------------
+# Visualize original vs reconstructed
+# -------------------------
+n = 10  # number of images to display
+plt.figure(figsize=(20, 4))
+for i in range(n):
+    # display original image
+    ax = plt.subplot(2, n, i + 1)
+    plt.imshow(x_test[i], cmap='gray')
+    plt.title("original")
+    plt.axis('off')
+
+    # display reconstruction
+    ax = plt.subplot(2, n, i + 1 + n)
+    plt.imshow(decoded_imgs[i], cmap='gray')
+    plt.title("reconstructed")
+    plt.axis('off')
+plt.show()
+
+# -------------------------
+# Optional: Plot training/validation loss
+# -------------------------
+plt.figure(figsize=(6,4))
+plt.plot(history.history['loss'], label='train_loss')
+plt.plot(history.history['val_loss'], label='val_loss')
+plt.title('Training and Validation Loss')
+plt.xlabel('Epoch')
+plt.ylabel('MSE Loss')
+plt.legend()
+plt.show()
